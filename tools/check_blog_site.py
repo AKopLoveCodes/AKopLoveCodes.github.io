@@ -4,7 +4,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "index.html"
-ARTICLE = ROOT / "blog" / "telco-survival-analysis-report.html"
+TELCO_ARTICLE = ROOT / "blog" / "telco-survival-analysis-report.html"
+CODEX_PROXY_ARTICLE = ROOT / "blog" / "ssh-remote-proxy-codex.html"
 STYLE = ROOT / "assets" / "style.css"
 BLOG_IMAGE_DIR = ROOT / "assets" / "images" / "blog" / "telco-survival-analysis"
 
@@ -31,13 +32,15 @@ def main() -> None:
     blog_section = between(index, '<section id="blog"', '<section id="work"')
 
     blog_cards = re.findall(r'class="[^"]*(?<![-\w])card(?![-\w])[^"]*"', blog_section)
-    assert len(blog_cards) == 1, "homepage should keep one blog card"
+    assert len(blog_cards) == 2, "homepage should show two blog cards"
     assert "Coming soon" not in blog_section
     assert "placeholder" not in blog_section.lower()
     assert 'href="blog/telco-survival-analysis-report.html"' in blog_section
-    assert ARTICLE.exists(), "blog detail page should exist under blog/"
+    assert 'href="blog/ssh-remote-proxy-codex.html"' in blog_section
+    assert TELCO_ARTICLE.exists(), "Telco blog detail page should exist under blog/"
+    assert CODEX_PROXY_ARTICLE.exists(), "Codex SSH proxy blog detail page should exist under blog/"
 
-    article = read(ARTICLE)
+    article = read(TELCO_ARTICLE)
     assert_no_draft_language(article)
     for required in [
         "IBM Telco Customer Churn",
@@ -65,6 +68,21 @@ def main() -> None:
         rel = f"../assets/images/blog/telco-survival-analysis/{image}"
         assert path.exists(), f"missing blog image asset: {image}"
         assert rel in article, f"article does not reference {image}"
+
+    codex_article = read(CODEX_PROXY_ARTICLE)
+    assert_no_draft_language(codex_article)
+    for required in [
+        "SSH 远程代理连接 Codex",
+        "RemoteForward 17890 127.0.0.1:7890",
+        "npm install -g @openai/codex",
+        "codex login",
+        "HTTP_PROXY=http://127.0.0.1:17890",
+        "<pre",
+    ]:
+        assert required in codex_article, f"missing Codex proxy tutorial content: {required}"
+    assert '../assets/style.css' in codex_article
+    assert '../assets/site.js' in codex_article
+    assert '../index.html#blog' in codex_article
 
     assert "STZhongsong" in style
     assert ".article-body" in style

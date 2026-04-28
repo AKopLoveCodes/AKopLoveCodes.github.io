@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="通过 SSH RemoteForward 将本地代理转发到远程 Linux 服务器，并在服务器上安装、登录和配置 Codex。"
+    >
+    <title>SSH 远程代理连接 Codex | AKopLoveCodes</title>
+    <link rel="stylesheet" href="../assets/style.css">
+    <script src="../assets/site.js" defer></script>
+  </head>
+  <body>
+    <div class="progress" id="progress" aria-hidden="true"></div>
+    <div class="cursor-glow" id="cursorGlow" aria-hidden="true"></div>
+
+    <div class="clouds" aria-hidden="true">
+      <div class="cloud one"></div>
+      <div class="cloud two"></div>
+      <div class="cloud three"></div>
+    </div>
+
+    <main class="page article-page">
+      <header>
+        <a class="brand" href="../index.html#top" aria-label="回到主页">
+          <span class="brand-mark">
+            <img src="../assets/images/site/brand-avatar.jpg" alt="">
+          </span>
+          <span>AKopLoveCodes</span>
+        </a>
+        <nav aria-label="主导航">
+          <a href="../index.html#about">About</a>
+          <a href="../index.html#blog">Blog</a>
+          <a href="../index.html#work">Work</a>
+          <a href="../index.html#contact">Contact</a>
+        </nav>
+      </header>
+
+      <article class="article-shell">
+        <section class="article-hero reveal">
+          <p class="article-kicker">Codex / SSH RemoteForward</p>
+          <h1>SSH 远程代理连接 Codex</h1>
+          <p class="article-lead">
+            远程 Linux 服务器没有可用代理时，可以用 SSH 的 <code>RemoteForward</code>
+            把本地代理端口转发到服务器，再让终端、Codex CLI 和 Codex 自身配置都走这个远程端口。
+            这篇记录保留最少步骤，适合临时服务器或没有桌面环境的机器。
+          </p>
+          <div class="metric-grid" aria-label="教程关键参数">
+            <div class="metric">
+              <span>本地代理</span>
+              <strong>7890</strong>
+            </div>
+            <div class="metric">
+              <span>远程端口</span>
+              <strong>17890</strong>
+            </div>
+            <div class="metric">
+              <span>Node 版本</span>
+              <strong>22</strong>
+            </div>
+            <div class="metric">
+              <span>入口命令</span>
+              <strong>codex</strong>
+            </div>
+          </div>
+        </section>
+
+        <div class="article-body reveal">
+          <section class="article-section">
+            <h2>1. 在服务器准备 Node 与 Codex</h2>
+            <p>
+              如果服务器没有 <code>curl</code>，但可以使用包管理器，先安装 <code>wget</code>。
+              没有 <code>sudo</code> 时需要用 root 用户执行，或请管理员预先安装。
+            </p>
+            <pre class="article-code"><code># Ubuntu
+apt install -y wget
+
+# CentOS
+yum install -y wget</code></pre>
+            <p>
+              接着用 <code>wget</code> 安装 nvm，再安装 Node 22 和 Codex CLI。
+            </p>
+            <pre class="article-code"><code>wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+source ~/.bashrc
+
+nvm install 22
+nvm use 22
+
+npm install -g @openai/codex</code></pre>
+          </section>
+
+          <section class="article-section">
+            <h2>2. 在本地 SSH 配置远程转发</h2>
+            <p>
+              在本地电脑的 <code>~/.ssh/config</code> 中为服务器增加配置。
+              关键是最后一行：它会把服务器上的 <code>127.0.0.1:17890</code>
+              转发到本地电脑的 <code>127.0.0.1:7890</code>。
+            </p>
+            <pre class="article-code"><code>Host my-linux
+    HostName 你的服务器IP或域名
+    User 你的Linux用户名
+    Port 22
+    IdentityFile C:\Users\你的用户名\.ssh\id_ed25519
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    RemoteForward 17890 127.0.0.1:7890</code></pre>
+            <div class="table-wrap">
+              <table class="report-table">
+                <caption>端口含义</caption>
+                <thead>
+                  <tr>
+                    <th>配置项</th>
+                    <th>说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>7890</td><td>本地代理软件监听端口，按自己的代理客户端修改。</td></tr>
+                  <tr><td>17890</td><td>服务器上暴露给命令行使用的代理端口。</td></tr>
+                  <tr><td>Port 22</td><td>SSH 登录端口，不是服务器 IP；若服务器改过 SSH 端口就填实际端口。</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="article-section">
+            <h2>3. 登录服务器后导出代理变量</h2>
+            <p>
+              使用上面的 Host 连接服务器后，在同一个终端里写入代理环境变量。
+              <code>codex login</code> 也要在这个终端执行，否则需要重新导出这些变量。
+            </p>
+            <pre class="article-code"><code>export http_proxy=http://127.0.0.1:17890
+export https_proxy=http://127.0.0.1:17890
+export HTTP_PROXY=http://127.0.0.1:17890
+export HTTPS_PROXY=http://127.0.0.1:17890
+export no_proxy=localhost,127.0.0.1,::1
+export NO_PROXY=localhost,127.0.0.1,::1</code></pre>
+            <p>
+              可以用 <code>wget</code> 检查代理链路是否打通。若返回
+              <code>HTTP/1.1 200 OK</code>，说明远程终端已经能通过本地代理访问网络。
+            </p>
+            <pre class="article-code"><code>wget --spider \
+  -e use_proxy=yes \
+  -e http_proxy=http://127.0.0.1:17890 \
+  https://www.google.com</code></pre>
+          </section>
+
+          <section class="article-section">
+            <h2>4. 登录 Codex 并持久化代理</h2>
+            <p>
+              代理测试通过后，直接在当前 SSH 终端登录 OpenAI 账号。
+            </p>
+            <pre class="article-code"><code>codex login</code></pre>
+            <p>
+              登录完成后，在服务器的 <code>~/.codex/.env</code> 中写入代理变量，
+              这样重启 Codex 后仍能正常使用代理。
+            </p>
+            <pre class="article-code"><code>HTTP_PROXY=http://127.0.0.1:17890
+HTTPS_PROXY=http://127.0.0.1:17890</code></pre>
+            <p>
+              最后重启 Codex 即可。也可以安装 VS Code 的 Codex extension，
+              通过可视化窗口连接同一台服务器使用。
+            </p>
+          </section>
+        </div>
+      </article>
+
+      <footer id="contact">
+        <div class="footer-panel reveal">
+          <span>Contact / Social / Archive</span>
+          <div class="social" aria-label="社交链接">
+            <a href="https://github.com/AKopLoveCodes" aria-label="GitHub">G</a>
+            <a href="../index.html#blog" aria-label="Back to blog">↑</a>
+          </div>
+        </div>
+      </footer>
+    </main>
+  </body>
+</html>
